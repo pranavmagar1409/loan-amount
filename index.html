@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoanLens · Loan approval check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#14213D; --ink-2:#1D2D52; --paper:#F3F5FA; --card:#fff; --line:#DCE1EE;
+  --blue:#3A56F0; --ok:#12906A; --no:#D6455D; --muted:#5B6684; --mint:#7FE3C0; --rose:#FF8FA3;
+  --display:"Bricolage Grotesque",system-ui,sans-serif; --body:"Figtree",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);background:var(--paper);color:var(--ink);line-height:1.5;min-height:100vh}
+.shell{display:grid;grid-template-columns:minmax(340px,38%) 1fr;min-height:100vh}
+
+/* verdict panel */
+.panel{background:var(--ink);color:#fff;padding:48px 44px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;transition:background .8s ease}
+.panel.ok{background:#0E3B3A}.panel.no{background:#3A1A2E}
+.brand{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.brand i{width:14px;height:14px;border-radius:50%;border:3px solid var(--mint);display:inline-block}
+.intro{animation:rise .9s .1s both cubic-bezier(.2,.7,.2,1)}
+.intro h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,3.4vw,44px);line-height:1.08;letter-spacing:-.02em;max-width:12ch}
+.intro p{margin-top:14px;color:#B9C3DE;max-width:34ch}
+.gauge{position:relative;width:min(280px,100%);aspect-ratio:1;margin:24px 0}
+.gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.track{fill:none;stroke:rgba(255,255,255,.12);stroke-width:14}
+.arc{fill:none;stroke:var(--mint);stroke-width:14;stroke-linecap:round;stroke-dasharray:597;stroke-dashoffset:597;transition:stroke-dashoffset 1.4s cubic-bezier(.2,.8,.2,1),stroke .5s}
+.panel.no .arc{stroke:var(--rose)}
+.panel.idle .track{animation:draw 1.6s .3s both ease-out;stroke-dasharray:597;stroke-dashoffset:597}
+.gauge .mid{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.mid b{font-family:var(--display);font-size:60px;font-weight:700;line-height:1;letter-spacing:-.03em}
+.mid span{font-size:14px;color:#B9C3DE;margin-top:6px}
+.verdict{font-family:var(--display);font-size:28px;font-weight:700;min-height:36px;letter-spacing:-.01em}
+.verdict small{display:block;font-family:var(--body);font-weight:400;font-size:15px;color:#B9C3DE;margin-top:6px}
+.panel.ok .verdict{color:var(--mint)}.panel.no .verdict{color:var(--rose)}
+.fine{font-size:12.5px;color:#8E9ABB;max-width:42ch}
+
+/* form */
+main{padding:48px clamp(24px,5vw,72px) 80px;max-width:880px}
+fieldset{border:0;margin-bottom:40px;padding:0}
+legend{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px}
+.hint{color:var(--muted);font-size:14px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px 20px}
+.f{display:flex;flex-direction:column;gap:6px}
+.f label{font-size:14px;font-weight:600}
+.f small{color:var(--muted);font-size:12.5px;min-height:0}
+input,select{font:inherit;color:inherit;background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;width:100%;transition:border-color .2s,box-shadow .2s}
+input:hover,select:hover{border-color:#B8C1DA}
+input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px rgba(58,86,240,.15)}
+.err input,.err select{border-color:var(--no)}
+.msg{color:var(--no);font-size:12.5px;display:none}.err .msg{display:block}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#E6EAF5;padding:5px;border-radius:12px}
+.seg label{margin:0;position:relative;text-align:center;font-weight:500;padding:9px;border-radius:8px;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
+.seg input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.seg label:has(input:checked){background:var(--card);box-shadow:0 1px 4px rgba(20,33,61,.18);font-weight:600}
+.seg label:has(input:focus-visible){box-shadow:0 0 0 3px rgba(58,86,240,.4)}
+.lti{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1.5px dashed var(--line);border-radius:12px;padding:14px 16px;margin-top:18px;font-size:14px}
+.lti b{font-family:var(--display);font-size:22px;transition:color .3s}
+.lti b.hi{color:var(--no)}
+button{font:inherit;font-weight:600;font-size:16px;background:var(--blue);color:#fff;border:0;border-radius:12px;padding:16px 28px;cursor:pointer;display:inline-flex;gap:10px;align-items:center;transition:transform .15s,box-shadow .2s,background .2s}
+button:hover{background:#2E47D6;box-shadow:0 8px 20px rgba(58,86,240,.3)}
+button:active{transform:translateY(1px)}
+button:focus-visible{outline:3px solid rgba(58,86,240,.45);outline-offset:3px}
+button[disabled]{opacity:.7;cursor:wait}
+.spin{width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;display:none}
+button.busy .spin{display:inline-block}
+.banner{display:none;margin-bottom:16px;background:#FDECEF;color:#8E1F33;padding:12px 14px;border-radius:10px;font-size:14px}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes rot{to{transform:rotate(360deg)}}
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .panel{position:relative;height:auto;gap:8px;padding:32px 24px}
+  .gauge{width:200px}.mid b{font-size:44px}
+  .grid{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="panel idle" id="panel" aria-live="polite">
+    <div class="brand"><i></i>LoanLens</div>
+    <div>
+      <div class="intro">
+        <h1>Check a loan application in seconds</h1>
+        <p>Enter the applicant's details. A decision-tree model trained on past loans returns approve or decline.</p>
+      </div>
+      <div class="gauge">
+        <svg viewBox="0 0 220 220"><circle class="track" cx="110" cy="110" r="95"/><circle class="arc" id="arc" cx="110" cy="110" r="95"/></svg>
+        <div class="mid"><b id="pct">–</b><span id="pctLabel">Model confidence</span></div>
+      </div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+    <p class="fine">This is a statistical estimate for demonstration. It is not financial advice or a final lending decision.</p>
+  </aside>
+
+  <main>
+    <form id="form" novalidate>
+      <div class="banner" id="banner"></div>
+
+      <fieldset>
+        <legend>Applicant</legend>
+        <p class="hint">Basic personal details.</p>
+        <div class="grid">
+          <div class="f"><label for="person_age">Age</label><input id="person_age" name="person_age" type="number" min="18" max="100" value="30" required><span class="msg"></span></div>
+          <div class="f"><label for="person_gender">Gender</label><select id="person_gender" name="person_gender"><option>female</option><option>male</option></select><span class="msg"></span></div>
+          <div class="f"><label for="person_education">Education</label><select id="person_education" name="person_education">{% for e in education %}<option{% if e=='Bachelor' %} selected{% endif %}>{{ e }}</option>{% endfor %}</select><span class="msg"></span></div>
+          <div class="f"><label for="person_home_ownership">Home ownership</label><select id="person_home_ownership" name="person_home_ownership">{% for h in home %}<option{% if h=='RENT' %} selected{% endif %}>{{ h }}</option>{% endfor %}</select><span class="msg"></span></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Work and income</legend>
+        <p class="hint">Yearly figures in dollars.</p>
+        <div class="grid">
+          <div class="f"><label for="person_income">Annual income ($)</label><input id="person_income" name="person_income" type="number" min="1" value="60000" required><span class="msg"></span></div>
+          <div class="f"><label for="person_emp_exp">Work experience (years)</label><input id="person_emp_exp" name="person_emp_exp" type="number" min="0" value="5" required><span class="msg"></span></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Loan request</legend>
+        <p class="hint">What the applicant wants to borrow.</p>
+        <div class="grid">
+          <div class="f"><label for="loan_amnt">Loan amount ($)</label><input id="loan_amnt" name="loan_amnt" type="number" min="1" value="10000" required><span class="msg"></span></div>
+          <div class="f"><label for="loan_intent">Loan purpose</label><select id="loan_intent" name="loan_intent">{% for i in intent %}<option value="{{ i }}"{% if i=='PERSONAL' %} selected{% endif %}>{{ i.replace('DEBTCONSOLIDATION','Debt consolidation').replace('HOMEIMPROVEMENT','Home improvement').title() if i in ('DEBTCONSOLIDATION','HOMEIMPROVEMENT') else i.title() }}</option>{% endfor %}</select><span class="msg"></span></div>
+          <div class="f"><label for="loan_int_rate">Interest rate (%)</label><input id="loan_int_rate" name="loan_int_rate" type="number" step="0.01" min="0" value="11.5" required><span class="msg"></span></div>
+        </div>
+        <div class="lti"><span>Loan as share of income</span><b id="lti">17%</b></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Credit profile</legend>
+        <p class="hint">From the applicant's credit report.</p>
+        <div class="grid">
+          <div class="f"><label for="credit_score">Credit score</label><input id="credit_score" name="credit_score" type="number" min="300" max="900" value="650" required><span class="msg"></span></div>
+          <div class="f"><label for="cb_person_cred_hist_length">Credit history (years)</label><input id="cb_person_cred_hist_length" name="cb_person_cred_hist_length" type="number" min="0" value="5" required><span class="msg"></span></div>
+          <div class="f"><label id="pl">Previous loan defaults</label>
+            <div class="seg" role="radiogroup" aria-labelledby="pl">
+              <label><input type="radio" name="previous_loan_defaults_on_file" value="No" checked>No</label>
+              <label><input type="radio" name="previous_loan_defaults_on_file" value="Yes">Yes</label>
+            </div><span class="msg"></span></div>
+        </div>
+      </fieldset>
+
+      <button type="submit" id="go"><span class="spin"></span><span id="goText">Check approval</span></button>
+    </form>
+  </main>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const form = $('#form'), panel = $('#panel'), arc = $('#arc');
+const CIRC = 597;
+
+function updateLti(){
+  const inc = +$('#person_income').value, amt = +$('#loan_amnt').value;
+  const el = $('#lti');
+  if(inc > 0 && amt >= 0){ const p = Math.round(amt / inc * 100); el.textContent = p + '%'; el.classList.toggle('hi', p >= 30); }
+  else el.textContent = '–';
+}
+['#person_income','#loan_amnt'].forEach(s => $(s).addEventListener('input', updateLti));
+updateLti();
+
+function countTo(el, target){
+  const start = performance.now(), dur = 1200;
+  (function tick(now){
+    const t = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(target * e) + '%';
+    if(t < 1) requestAnimationFrame(tick);
+  })(start);
+}
+
+function clearErrors(){
+  document.querySelectorAll('.f.err').forEach(f => f.classList.remove('err'));
+  $('#banner').style.display = 'none';
+}
+
+function showErrors(errors){
+  let first = null;
+  Object.entries(errors).forEach(([name, text]) => {
+    const input = form.querySelector(`[name="${name}"]`);
+    const box = input && input.closest('.f');
+    if(box){ box.classList.add('err'); box.querySelector('.msg').textContent = text; first = first || input; }
+  });
+  if(first) first.focus();
+}
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  clearErrors();
+  const data = Object.fromEntries(new FormData(form));
+  const btn = $('#go'); btn.disabled = true; btn.classList.add('busy'); $('#goText').textContent = 'Checking…';
+  try{
+    const res = await fetch('/predict', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const out = await res.json();
+    if(!res.ok || !out.ok){ showErrors(out.errors || {}); throw new Error('Fix the highlighted fields and try again.'); }
+
+    panel.classList.remove('idle','ok','no');
+    arc.style.transition = 'none'; arc.style.strokeDashoffset = CIRC; void arc.getBoundingClientRect(); arc.style.transition = '';
+    panel.classList.add(out.approved ? 'ok' : 'no');
+    arc.style.strokeDashoffset = CIRC * (1 - out.confidence / 100);
+    countTo($('#pct'), out.confidence);
+    $('#pctLabel').textContent = 'Model confidence';
+    $('#verdict').innerHTML = (out.approved ? 'Likely approved' : 'Likely declined') +
+      `<small>${out.approved ? 'This profile resembles applications approved in the training data.' : 'This profile resembles applications declined in the training data.'} Loan is ${out.loan_percent_income}% of income.</small>`;
+    if(window.innerWidth <= 900) panel.scrollIntoView({behavior:'smooth'});
+  }catch(err){
+    const b = $('#banner'); b.textContent = err.message === 'Failed to fetch' ? 'Could not reach the server. Check your connection and try again.' : err.message; b.style.display = 'block';
+  }finally{
+    btn.disabled = false; btn.classList.remove('busy'); $('#goText').textContent = 'Check approval';
+  }
+});
+</script>
+</body>
+</html>
